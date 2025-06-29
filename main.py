@@ -22,10 +22,19 @@ def parse_duration(s):
 
 df['duration_hours'] = df['Duration'].apply(parse_duration)
 
-# Filter for constitution and civil
-mask = df['Category'].str.contains('civil', case=False) | df['Category'].str.contains('constitution', case=False)
-df2 = df[mask].copy()
-df2['Category'] = df2['Category'].apply(lambda x: 'constitution' if 'constitution' in x.lower() else 'civil')
+# Define new categories based on keywords
+def assign_category(description):
+    description_lower = description.lower()
+    if 'constitution' in description_lower and '論文マスター' in description:
+        return 'Constitution - Essay Master'
+    if 'constitution' in description_lower and 'basic' in description_lower:
+        return 'Constitution - Basic'
+    if 'civil' in description_lower and '総則' in description:
+        return 'Civil Law - General Provisions'
+    return None
+
+df['Category'] = df['Category'].apply(assign_category)
+df2 = df.dropna(subset=['Category']).copy()
 
 # Compute week_start as the preceding Sunday
 df2['week_start'] = df2['Start'] - pd.to_timedelta((df2['Start'].dt.weekday + 1) % 7, unit='d')
