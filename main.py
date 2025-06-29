@@ -2,9 +2,16 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import re
+import argparse
+
+# Set up argument parser
+parser = argparse.ArgumentParser(description='Generate study report from time tracking data.')
+parser.add_argument('csv_file', nargs='?', default='Time Tracking 2025-06-29.csv',
+                    help='Path to the time tracking CSV file.')
+args = parser.parse_args()
 
 # Load data
-df = pd.read_csv('./Time Tracking 2025-06-29.csv', parse_dates=['Start'])
+df = pd.read_csv(args.csv_file, parse_dates=['Start'])
 
 # Parse duration into hours
 def parse_duration(s):
