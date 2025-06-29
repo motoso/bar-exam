@@ -49,6 +49,7 @@ weekly = weekly.reindex(all_weeks, fill_value=0)
 weekly.index.name = 'week_start'
 
 # Plot stacked bar chart
+plt.style.use('fivethirtyeight')
 fig, ax = plt.subplots()
 ind = np.arange(len(weekly))
 bottom = np.zeros(len(weekly))
