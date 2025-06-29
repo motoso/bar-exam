@@ -58,11 +58,11 @@ for cat in weekly.columns:
     bottom += weekly[cat].values
 
 ax.set_xticks(ind)
-ax.set_xticklabels([d.strftime('%Y-%m-%d') for d in weekly.index], rotation=45)
-ax.set_xlabel('Week Start')
-ax.set_ylabel('Hours Studied')
-ax.set_title('Weekly Study Time for Bar Exam Preparation')
-ax.legend(title='Category')
+ax.set_xticklabels([d.strftime('%Y-%m-%d') for d in weekly.index], rotation=45, fontsize='small')
+ax.set_xlabel('Week Start', fontsize='small')
+ax.set_ylabel('Hours Studied', fontsize='small')
+ax.set_title('Weekly Study Time for Bar Exam Preparation', fontsize='small')
+ax.legend(title='Category', fontsize='small')
 plt.tight_layout()
 plt.show()
 
