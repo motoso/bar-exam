@@ -1,0 +1,59 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import re
+
+# Load data
+df = pd.read_csv('./Time Tracking 2025-06-29.csv', parse_dates=['Start'])
+
+# Parse duration into hours
+def parse_duration(s):
+    hours = sum(float(m) for m in re.findall(r'(\d+(?:\.\d+)?)\s*hr', s))
+    minutes = sum(float(m) for m in re.findall(r'(\d+(?:\.\d+)?)\s*min', s))
+    seconds = sum(float(m) for m in re.findall(r'(\d+(?:\.\d+)?)\s*sec', s))
+    return hours + minutes / 60 + seconds / 3600
+
+df['duration_hours'] = df['Duration'].apply(parse_duration)
+
+# Filter for constitution and civil
+mask = df['Category'].str.contains('civil', case=False) | df['Category'].str.contains('constitution', case=False)
+df2 = df[mask].copy()
+df2['Category'] = df2['Category'].apply(lambda x: 'constitution' if 'constitution' in x.lower() else 'civil')
+
+# Compute week_start as the preceding Sunday
+df2['week_start'] = df2['Start'] - pd.to_timedelta((df2['Start'].dt.weekday + 1) % 7, unit='d')
+df2['week_start'] = df2['week_start'].dt.normalize()
+
+# Weekly aggregation
+weekly = df2.groupby(['week_start', 'Category'])['duration_hours'].sum().unstack(fill_value=0)
+
+# Ensure all weeks from 2025-02-02 onwards are present
+all_weeks = pd.date_range(start='2025-02-02', end=weekly.index.max(), freq='7D')
+weekly = weekly.reindex(all_weeks, fill_value=0)
+weekly.index.name = 'week_start'
+
+# Plot stacked bar chart
+fig, ax = plt.subplots()
+ind = np.arange(len(weekly))
+bottom = np.zeros(len(weekly))
+for cat in weekly.columns:
+    ax.bar(ind, weekly[cat].values, width=0.8, bottom=bottom, label=cat)
+    bottom += weekly[cat].values
+
+ax.set_xticks(ind)
+ax.set_xticklabels([d.strftime('%Y-%m-%d') for d in weekly.index], rotation=45)
+ax.set_xlabel('Week Start')
+ax.set_ylabel('Hours Studied')
+ax.set_title('Weekly Study Time for Bar Exam Preparation')
+ax.legend(title='Category')
+plt.tight_layout()
+plt.show()
+
+# Task 2: calculate study times
+start_week = pd.to_datetime('2025-06-22')
+end_week = pd.to_datetime('2025-06-28') + pd.Timedelta(days=1) - pd.Timedelta(microseconds=1)
+current_week_total = df2[(df2['Start'] >= start_week) & (df2['Start'] <= end_week)]['duration_hours'].sum()
+cumulative_total = df2[df2['Start'] <= end_week]['duration_hours'].sum()
+
+print(f"Study time from 2025-06-22 to 2025-06-28: {current_week_total:.2f} hours")
+print(f"Cumulative study time up to 2025-06-28: {cumulative_total:.2f} hours")
