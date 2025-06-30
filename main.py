@@ -3,11 +3,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 import re
 import argparse
+import datetime
 
 # Set up argument parser
 parser = argparse.ArgumentParser(description='Generate study report from time tracking data.')
 parser.add_argument('csv_file', nargs='?', default='Time Tracking 2025-06-29.csv',
                     help='Path to the time tracking CSV file.')
+parser.add_argument('--end-date', default=datetime.date.today().strftime('%Y-%m-%d'),
+                    help='The end date of the week to include in the summary (YYYY-MM-DD), typically a Saturday.')
 args = parser.parse_args()
 
 # Load data
@@ -48,17 +51,23 @@ all_weeks = pd.date_range(start='2025-02-02', end=weekly.index.max(), freq='7D')
 weekly = weekly.reindex(all_weeks, fill_value=0)
 weekly.index.name = 'week_start'
 
+end_date = pd.to_datetime(args.end_date)
+start_of_week = end_date - pd.Timedelta(days=6)
+
+# Include all data up to the specified end_date in the graph
+weekly_graph = weekly[weekly.index <= end_date.normalize()]
+
 # Plot stacked bar chart
 plt.style.use('fivethirtyeight')
 fig, ax = plt.subplots()
-ind = np.arange(len(weekly))
-bottom = np.zeros(len(weekly))
-for cat in weekly.columns:
-    ax.bar(ind, weekly[cat].values, width=0.8, bottom=bottom, label=cat)
-    bottom += weekly[cat].values
+ind = np.arange(len(weekly_graph))
+bottom = np.zeros(len(weekly_graph))
+for cat in weekly_graph.columns:
+    ax.bar(ind, weekly_graph[cat].values, width=0.8, bottom=bottom, label=cat)
+    bottom += weekly_graph[cat].values
 
 ax.set_xticks(ind)
-ax.set_xticklabels([d.strftime('%Y-%m-%d') for d in weekly.index], rotation=45, fontsize='small')
+ax.set_xticklabels([d.strftime('%Y-%m-%d') for d in weekly_graph.index], rotation=45, ha='right', fontsize='small')
 ax.set_xlabel('Week Start', fontsize='small')
 ax.set_ylabel('Hours Studied', fontsize='small')
 ax.set_title('Weekly Study Time for Bar Exam Preparation', fontsize='small')
@@ -67,10 +76,10 @@ plt.tight_layout()
 plt.show()
 
 # Task 2: calculate study times
-start_week = pd.to_datetime('2025-06-22')
-end_week = pd.to_datetime('2025-06-28') + pd.Timedelta(days=1) - pd.Timedelta(microseconds=1)
+start_week = start_of_week
+end_week = end_date + pd.Timedelta(days=1) - pd.Timedelta(microseconds=1)
 current_week_total = df2[(df2['Start'] >= start_week) & (df2['Start'] <= end_week)]['duration_hours'].sum()
 cumulative_total = df2[df2['Start'] <= end_week]['duration_hours'].sum()
 
-print(f"Study time from 2025-06-22 to 2025-06-28: {current_week_total:.2f} hours")
-print(f"Cumulative study time up to 2025-06-28: {cumulative_total:.2f} hours")
+print(f"Study time from {start_of_week.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}: {current_week_total:.2f} hours")
+print(f"Cumulative study time up to {end_date.strftime('%Y-%m-%d')}: {cumulative_total:.2f} hours")
