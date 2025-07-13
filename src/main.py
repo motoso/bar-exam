@@ -32,6 +32,8 @@ def assign_category(description):
         return 'Constitution - Essay Master'
     if 'constitution' in description_lower and 'basic' in description_lower:
         return 'Constitution - Basic'
+    if 'constitution' in description_lower and '短答' in description_lower:
+        return 'Constitution - MCQs'
     if 'civil' in description_lower and '総則' in description:
         return 'Civil Law - General Provisions'
     return None
