@@ -83,5 +83,5 @@ end_week = end_date + pd.Timedelta(days=1) - pd.Timedelta(microseconds=1)
 current_week_total = df2[(df2['Start'] >= start_week) & (df2['Start'] <= end_week)]['duration_hours'].sum()
 cumulative_total = df2[df2['Start'] <= end_week]['duration_hours'].sum()
 
-print(f"Study time from {start_of_week.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}: {current_week_total:.2f} hours")
-print(f"Cumulative study time up to {end_date.strftime('%Y-%m-%d')}: {cumulative_total:.2f} hours")
+print(f"今週の勉強時間（{start_of_week.strftime('%Y-%m-%d')} - {end_date.strftime('%Y-%m-%d')}）: {current_week_total:.1f} 時間")
+print(f"累積勉強時間（〜{end_date.strftime('%Y-%m-%d')}）: {cumulative_total:.1f} 時間")
