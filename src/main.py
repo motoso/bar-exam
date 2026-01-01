@@ -36,6 +36,8 @@ def assign_category(description):
         return 'Constitution - MCQs'
     if 'civil' in description_lower and '総則' in description:
         return 'Civil Law - General Provisions'
+    if 'civil' in description_lower and '物権' in description:
+        return 'Civil Law - Property Rights'
     return None
 
 df['Category'] = df['Category'].apply(assign_category)
