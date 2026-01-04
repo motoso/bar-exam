@@ -63,7 +63,7 @@ weekly_graph = weekly[weekly.index <= end_date.normalize()]
 
 # Plot stacked bar chart
 plt.style.use('fivethirtyeight')
-fig, ax = plt.subplots()
+fig, ax = plt.subplots(figsize=(14, 6))
 ind = np.arange(len(weekly_graph))
 bottom = np.zeros(len(weekly_graph))
 for cat in weekly_graph.columns:
