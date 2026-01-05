@@ -80,10 +80,14 @@ def get_activity_type(notes):
 
     notes_str = str(notes).lower()
 
-    if "anki" in notes_str or "復習" in notes_str:
+    # Anki/復習の判定（テキスト読み、読み返しも含む）
+    if "anki" in notes_str or "復習" in notes_str or "復讐" in notes_str or \
+       "テキスト" in notes_str or "読み" in notes_str:
         return "Anki"
-    elif "短答" in notes_str or "過去問" in notes_str:
+    # 短答の判定（問題を解いた、演習も含む）
+    elif "短答" in notes_str or "過去問" in notes_str or "問題" in notes_str or "演習" in notes_str:
         return "短答"
+    # 講義の判定（数字で始まる）
     elif re.match(r'^\d+', notes_str.strip()):
         return "講義"
     else:
@@ -109,8 +113,8 @@ def main():
     # CSVを読み込み
     df = pd.read_csv(csv_path)
 
-    # civil 総則のみ抽出
-    df_civil = df[df['Category'] == 'civil 総則'].copy()
+    # civil 総則と civil 物権を抽出
+    df_civil = df[df['Category'].isin(['civil 総則', 'civil 物権'])].copy()
 
     # Duration を時間に変換
     df_civil['Hours'] = df_civil['Duration'].apply(parse_duration)
@@ -119,44 +123,76 @@ def main():
     df_civil['DateTime'] = pd.to_datetime(df_civil['Start'])
     df_civil = df_civil.sort_values('DateTime').reset_index(drop=True)
 
-    # 各行にセット番号を割り当て
+    # 各行にセット番号と活動タイプを割り当て
     current_set = 1  # 現在追跡中のセット（最初はセット1とする）
+    current_activity = "講義"  # 現在の活動タイプ（最初は講義とする）
     set_assignments = []
+    activity_assignments = []
 
     for idx, row in df_civil.iterrows():
         notes = row['Notes']
         activity = get_activity_type(notes)
         lecture_nums = extract_lecture_numbers(notes)
+        dt_str = str(row['DateTime'])
 
         assigned_set = None
 
-        if activity == "講義":
-            # 講義の場合、コマ番号から直接セットを決定
-            if lecture_nums:
-                lecture_num = max(lecture_nums)  # 複数ある場合は最大値
-                assigned_set = get_set_from_lecture_num(lecture_num)
-                current_set = assigned_set
-
-        elif activity == "Anki":
-            # Ankiの場合、Notesに含まれる最大コマ番号のセットに割り当て
-            if lecture_nums:
-                max_lecture = max(lecture_nums)
-                assigned_set = get_set_from_lecture_num(max_lecture)
+        # 特定の空白データを強制的に割り当て
+        if activity == "空白":
+            if dt_str.startswith('2025-05-07 23:30'):
+                # セット1に割り当て
+                assigned_set = 1
+                activity = "講義"
+            elif dt_str.startswith('2025-07-23 11:24'):
+                # セット7の講義に割り当て（21コマ）
+                assigned_set = 7
+                activity = "講義"
+            elif dt_str.startswith('2025-12-17 10:45') or dt_str.startswith('2025-12-17 12:29'):
+                # セット15の講義に割り当て（43-45コマ）
+                assigned_set = 15
+                activity = "講義"
             else:
-                # コマ番号がない場合は現在のセットに割り当て
+                # その他の空白は直前の活動タイプを引き継ぐ
+                activity = current_activity
+        elif activity != "その他":
+            # 空白以外の場合は現在の活動タイプを更新
+            current_activity = activity
+
+        # 強制割り当てされていない場合のみ、通常の割り当て処理を実行
+        if assigned_set is None:
+            if activity == "講義":
+                # 講義の場合、コマ番号から直接セットを決定
+                if lecture_nums:
+                    lecture_num = max(lecture_nums)  # 複数ある場合は最大値
+                    assigned_set = get_set_from_lecture_num(lecture_num)
+                    current_set = assigned_set
+
+            elif activity == "Anki":
+                # Ankiの場合、Notesに含まれる最大コマ番号のセットに割り当て
+                if lecture_nums:
+                    max_lecture = max(lecture_nums)
+                    assigned_set = get_set_from_lecture_num(max_lecture)
+                else:
+                    # コマ番号がない場合は現在のセットに割り当て
+                    assigned_set = current_set
+
+            elif activity == "短答":
+                # 短答は直前のセットに割り当て
                 assigned_set = current_set
 
-        elif activity == "短答":
-            # 短答は直前のセットに割り当て
-            assigned_set = current_set
+            elif activity == "その他":
+                # その他は直前のセットに割り当て
+                assigned_set = current_set
 
-        elif activity == "空白" or activity == "その他":
-            # 空白やその他は直前のセットに割り当て
-            assigned_set = current_set
+        # 強制割り当てされた講義はcurrent_setも更新
+        if assigned_set is not None and activity == "講義":
+            current_set = assigned_set
 
         set_assignments.append(assigned_set)
+        activity_assignments.append(activity)
 
     df_civil['Set'] = set_assignments
+    df_civil['ActivityType'] = activity_assignments
 
     # 未割り当てデータの確認
     df_unassigned = df_civil[pd.isna(df_civil['Set'])].copy()
@@ -164,8 +200,14 @@ def main():
     assigned_rows = len(df_civil[pd.notna(df_civil['Set'])])
     unassigned_rows = len(df_unassigned)
 
+    # カテゴリ別件数
+    sousoku_count = len(df_civil[df_civil['Category'] == 'civil 総則'])
+    bukken_count = len(df_civil[df_civil['Category'] == 'civil 物権'])
+
     print("=== データ統計 ===\n")
     print(f"総データ数: {total_rows}")
+    print(f"  - civil 総則: {sousoku_count}件")
+    print(f"  - civil 物権: {bukken_count}件")
     print(f"セット割り当て済み: {assigned_rows}")
     print(f"セット未割り当て: {unassigned_rows}")
     print()
@@ -190,7 +232,6 @@ def main():
         end_lecture = int(set_num * 3)
 
         # 講義時間
-        df_set['ActivityType'] = df_set['Notes'].apply(get_activity_type)
         lecture_hours = df_set[df_set['ActivityType'] == '講義']['Hours'].sum()
 
         # Anki時間
@@ -199,8 +240,8 @@ def main():
         # 短答時間
         tanto_hours = df_set[df_set['ActivityType'] == '短答']['Hours'].sum()
 
-        # その他・空白
-        other_hours = df_set[df_set['ActivityType'].isin(['その他', '空白'])]['Hours'].sum()
+        # その他
+        other_hours = df_set[df_set['ActivityType'] == 'その他']['Hours'].sum()
 
         # 合計
         total_hours = lecture_hours + anki_hours + tanto_hours + other_hours
@@ -235,6 +276,27 @@ def main():
         other_str = format_hours_to_hhmm(s['other'])
         total_str = format_hours_to_hhmm(s['total'])
         print(f"  {int(set_num):2d}    | {s['range']:7s} | {lecture_str:5s} | {anki_str:5s} | {tanto_str:5s} | {other_str:6s} | {total_str:5s}")
+
+    # 統計データ
+    print("\n\n=== 統計データ ===\n")
+
+    # 講義の平均時間
+    total_lecture = sum(s['lecture'] for s in set_summary.values())
+    avg_lecture = total_lecture / len(sets) if sets else 0
+
+    # Anki + 短答の平均時間
+    total_anki_tanto = sum(s['anki'] + s['tanto'] for s in set_summary.values())
+    avg_anki_tanto = total_anki_tanto / len(sets) if sets else 0
+
+    # 全体の平均時間
+    total_all = sum(s['total'] for s in set_summary.values())
+    avg_all = total_all / len(sets) if sets else 0
+
+    print(f"講義の平均時間:         {format_hours_to_hhmm(avg_lecture)}")
+    print(f"復習+短答の平均時間:    {format_hours_to_hhmm(avg_anki_tanto)}")
+    print(f"1セットの平均時間:      {format_hours_to_hhmm(avg_all)}")
+    print(f"\n総セット数:             {len(sets)}セット")
+    print(f"総学習時間:             {format_hours_to_hhmm(total_all)}")
 
     print()
 
