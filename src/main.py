@@ -5,6 +5,9 @@ import re
 import argparse
 import datetime
 
+STUDY_START = pd.Timestamp('2025-02-02')
+YEAR2_START = pd.Timestamp('2026-02-01')
+
 # Set up argument parser
 parser = argparse.ArgumentParser(description='Generate study report from time tracking data.')
 parser.add_argument('csv_file', nargs='?', default='Time Tracking 2025-06-29.csv',
@@ -67,22 +70,85 @@ weekly.index.name = 'week_start'
 # Include all data up to the specified end_date in the graph
 weekly_graph = weekly[weekly.index <= end_date.normalize()]
 
-# Plot stacked bar chart
-plt.style.use('fivethirtyeight')
-fig, ax = plt.subplots(figsize=(14, 6))
-ind = np.arange(len(weekly_graph))
-bottom = np.zeros(len(weekly_graph))
-for cat in weekly_graph.columns:
-    ax.bar(ind, weekly_graph[cat].values, width=0.8, bottom=bottom, label=cat)
-    bottom += weekly_graph[cat].values
+# Split data into Year 1 and Year 2
+year1 = weekly_graph[(weekly_graph.index >= STUDY_START) & (weekly_graph.index < YEAR2_START)]
+year2 = weekly_graph[weekly_graph.index >= YEAR2_START]
 
-ax.set_xticks(ind)
-ax.set_xticklabels([d.strftime('%Y-%m-%d') for d in weekly_graph.index], rotation=45, ha='right', fontsize='small')
-ax.set_xlabel('Week Start', fontsize='small')
-ax.set_ylabel('Hours Studied', fontsize='small')
-ax.set_title('Weekly Study Time for Bar Exam Preparation', fontsize='small')
-ax.legend(title='Category', fontsize='small')
-plt.tight_layout()
+# Assign relative week numbers (0-based)
+year1_weeks = np.arange(len(year1))
+year2_weeks = np.arange(len(year2))
+
+# --- Single figure: Year 2, Year 1, Cumulative (3 rows) ---
+plt.style.use('fivethirtyeight')
+
+# Fixed color map using fivethirtyeight's color cycle for consistency across both years
+all_categories = weekly_graph.columns.tolist()
+style_colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+category_colors = {cat: style_colors[i % len(style_colors)] for i, cat in enumerate(all_categories)}
+fig, (ax_y2, ax_y1, ax_cum) = plt.subplots(3, 1, figsize=(14, 14))
+
+def plot_stacked_bar(ax, data, weeks, title):
+    if len(data) == 0:
+        ax.set_title(title, fontsize='small')
+        ax.annotate('No data', xy=(0.5, 0.5), xycoords='axes fraction',
+                     ha='center', va='center', fontsize=14, color='gray')
+        return
+    bottom = np.zeros(len(data))
+    for cat in all_categories:
+        if cat in data.columns:
+            values = data[cat].values
+        else:
+            values = np.zeros(len(data))
+        ax.bar(weeks, values, width=0.8, bottom=bottom,
+               label=cat, color=category_colors[cat])
+        bottom += values
+    ax.set_title(title, fontsize='small')
+    ax.set_ylabel('Hours Studied', fontsize='small')
+    tick_positions = [w for w in weeks if w % 5 == 0]
+    tick_labels = [f'W{w+1}' for w in tick_positions]
+    ax.set_xticks(tick_positions)
+    ax.set_xticklabels(tick_labels, fontsize='small')
+    ax.set_xlabel('Week', fontsize='small')
+
+plot_stacked_bar(ax_y2, year2, year2_weeks, 'Year 2 (2026-02-01 ~)')
+plot_stacked_bar(ax_y1, year1, year1_weeks, 'Year 1 (2025-02-02 ~ 2026-01-25)')
+
+# Align x-axis range
+max_weeks = max(len(year1), len(year2), 1)
+ax_y1.set_xlim(-0.5, max_weeks - 0.5)
+ax_y2.set_xlim(-0.5, max_weeks - 0.5)
+
+# Align y-axis scale between Year 1 and Year 2
+shared_ymax = max(ax_y1.get_ylim()[1], ax_y2.get_ylim()[1])
+ax_y1.set_ylim(0, shared_ymax)
+ax_y2.set_ylim(0, shared_ymax)
+
+# Single shared legend for bar charts
+handles, labels = ax_y1.get_legend_handles_labels()
+if not handles:
+    handles, labels = ax_y2.get_legend_handles_labels()
+fig.legend(handles, labels, title='Category', loc='upper right',
+           fontsize='small', title_fontsize='small')
+
+# Cumulative line chart
+year1_cumulative = year1.sum(axis=1).cumsum()
+year2_cumulative = year2.sum(axis=1).cumsum()
+
+if len(year1_cumulative) > 0:
+    ax_cum.plot(year1_weeks, year1_cumulative.values, marker='o', markersize=3,
+                label='Year 1', color='steelblue')
+if len(year2_cumulative) > 0:
+    ax_cum.plot(year2_weeks, year2_cumulative.values, marker='s', markersize=3,
+                label='Year 2', color='coral')
+
+ax_cum.set_xlabel('Weeks since start', fontsize='small')
+ax_cum.set_ylabel('Cumulative Hours', fontsize='small')
+ax_cum.set_title('Cumulative Study Time — Year Comparison', fontsize='small')
+ax_cum.legend(fontsize='small')
+ax_cum.grid(True, alpha=0.3)
+
+fig.suptitle('Weekly Study Time — Year Comparison', fontsize='medium')
+fig.tight_layout(rect=[0, 0, 1, 0.96])
 plt.show()
 
 # Task 2: calculate study times
