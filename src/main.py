@@ -78,13 +78,13 @@ year2 = weekly_graph[weekly_graph.index >= YEAR2_START]
 year1_weeks = np.arange(len(year1))
 year2_weeks = np.arange(len(year2))
 
-# Fixed color map for consistency across both years
-all_categories = weekly_graph.columns.tolist()
-cmap = plt.cm.get_cmap('tab10')
-category_colors = {cat: cmap(i) for i, cat in enumerate(all_categories)}
-
 # --- Single figure: Year 2, Year 1, Cumulative (3 rows) ---
 plt.style.use('fivethirtyeight')
+
+# Fixed color map using fivethirtyeight's color cycle for consistency across both years
+all_categories = weekly_graph.columns.tolist()
+style_colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+category_colors = {cat: style_colors[i % len(style_colors)] for i, cat in enumerate(all_categories)}
 fig, (ax_y2, ax_y1, ax_cum) = plt.subplots(3, 1, figsize=(14, 14))
 
 def plot_stacked_bar(ax, data, weeks, title):
