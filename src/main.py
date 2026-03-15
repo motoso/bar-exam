@@ -50,13 +50,19 @@ df2['week_start'] = df2['week_start'].dt.normalize()
 # Weekly aggregation
 weekly = df2.groupby(['week_start', 'Category'])['duration_hours'].sum().unstack(fill_value=0)
 
-# Ensure all weeks from 2025-02-02 onwards are present
-all_weeks = pd.date_range(start='2025-02-02', end=weekly.index.max(), freq='7D')
-weekly = weekly.reindex(all_weeks, fill_value=0)
-weekly.index.name = 'week_start'
-
 end_date = pd.to_datetime(args.end_date)
 start_of_week = end_date - pd.Timedelta(days=6)
+
+# Ensure all weeks from 2025-02-02 onwards are present.
+# Only include a week if it's complete (Sunday–Saturday), so only go up to the last Saturday.
+end_week_start = end_date - pd.Timedelta(days=int((end_date.weekday() + 1) % 7))
+end_week_start = end_week_start.normalize()
+# weekday() == 5 means Saturday; if end_date is not Saturday, the current week is incomplete — exclude it
+if end_date.weekday() != 5:
+    end_week_start -= pd.Timedelta(days=7)
+all_weeks = pd.date_range(start='2025-02-02', end=end_week_start, freq='7D')
+weekly = weekly.reindex(all_weeks, fill_value=0)
+weekly.index.name = 'week_start'
 
 # Include all data up to the specified end_date in the graph
 weekly_graph = weekly[weekly.index <= end_date.normalize()]
